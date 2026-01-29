@@ -1,0 +1,18 @@
+# SRCC Champion - Best model for overall correlation
+# Uses compression_later + basic_cnn_avg encoder combination
+
+predictor:
+  architecture:
+    text_encoder: compression_later
+    noise_encoder: basic_cnn_avg
+    dropout: 0.1
+    num_heads: 1  # single-target mode (update to 3 if using multi-target checkpoint)
+
+  weights:
+    # UPDATE THIS PATH with your actual SRCC champion checkpoint
+    checkpoint_path: /home/jkim5/pnm/pnm/experiments/config/multi_compression_later_basic_cnn_avg_mae_srcc_lr1e-4_ndcg10/best_model.pth
+    device: cuda
+
+  normalization:
+    multi_target: false  # update to true if using multi-target checkpoint
+    target: hpsv2
