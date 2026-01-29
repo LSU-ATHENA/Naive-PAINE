@@ -141,6 +141,10 @@ class PixArtAlphaPNMPipeline(PixArtAlphaPipeline, PredictorMixin):
                 max_sequence_length=max_sequence_length,
                 predictor_head_index=predictor_head_index,
             )
+            # Clear prompt/negative_prompt since we now have embeddings
+            # (parent pipeline doesn't allow both)
+            prompt = None
+            negative_prompt = None
         elif use_predictor and not self.has_predictor:
             logger.warning(
                 "use_predictor=True but no predictor loaded. "
