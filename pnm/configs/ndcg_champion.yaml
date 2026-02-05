@@ -1,0 +1,18 @@
+# NDCG Champion - Best model for top-K ranking tasks
+# Uses multi-target pertokenscalar + spatial_shrink with LambdaRank
+
+predictor:
+  architecture:
+    text_encoder: pertokenscalar
+    noise_encoder: spatial_shrink
+    dropout: 0.1
+    num_heads: 3  # multi-target mode
+
+  weights:
+    # Download from Google Drive and place in checkpoints/ folder
+    checkpoint_path: ./pnm/configs/ckpt/ndcg/best_model.pth
+    device: cuda
+
+  normalization:
+    multi_target: true
+    target: hpsv2  # primary target for ranking

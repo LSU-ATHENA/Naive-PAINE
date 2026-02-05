@@ -10,15 +10,16 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
+# Training dataloader (prep_dataloaders, denormalize) lives on the remote server
+# Make sure the dataloader module is importable (e.g., in PYTHONPATH)
 from dataloader import prep_dataloaders, denormalize, AVAILABLE_TARGETS
-from models import get_model, NOISE_ENCODERS, TEXT_ENCODERS
 
-from losses import (
-    # Metrics
+from pnm.models import get_model, NOISE_ENCODERS, TEXT_ENCODERS
+
+from pnm.training.losses import (
     ndcg_at_k,
     spearman_corrcoef,
     pearson_corrcoef,
-    # Loss classes
     SRCCLoss,
     CombinedLoss,
     MAESRCCLoss,
@@ -388,13 +389,16 @@ def main():
     args = parser.parse_args()
 
     # Set loss-specific epochs and patience defaults
+    # lambdarank: 100 epochs, patience 35
+    # mse/mae: 80 epochs, patience 15
+    # hybrid losses (mae+srcc, mae+lambdarank, mae+srcc+lambdarank): 150 epochs, patience 50
     if args.epochs == -1 or args.patience == -1:
         if args.loss == 'lambdarank':
-            default_epochs, default_patience = 125, 20
+            default_epochs, default_patience = 100, 35
         elif args.loss in ['mse', 'mae']:
-            default_epochs, default_patience = 100, 20
+            default_epochs, default_patience = 80, 15
         else:  # hybrid losses: mae+srcc, mae+lambdarank, mae+srcc+lambdarank, mse+srcc
-            default_epochs, default_patience = 150, 30
+            default_epochs, default_patience = 150, 50
 
         if args.epochs == -1:
             args.epochs = default_epochs
@@ -484,7 +488,7 @@ def main():
         raise ValueError(f"Unknown loss: {args.loss}")
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=10
+        optimizer, mode='max', factor=0.5, patience=5
     )
 
     # ---------------------------------------------------------

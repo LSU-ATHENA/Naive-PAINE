@@ -1,37 +1,12 @@
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-
-# Checkpoints and model weights (share via Google Drive)
-checkpoints/
+*.pyc
 *.pth
 *.pt
 *.safetensors
-
-# Experiments and outputs
+ckpt/
 output/
-out/
-experiments/
-experiments_v1/
-experiments_test/
-shared_assets/
-pixart_512/
-
-# Jupyter notebooks
-.ipynb_checkpoints/
-*.ipynb
-
-# Training scripts (not needed for inference)
-train_lambdagrouped.py
-parse_loss_comparison.py
-*.sh
-
-# IDE
-.vscode/
-.idea/
-
-# OS
+pnm/configs/ckpt/
 .DS_Store
-
+*.ipynb
+scripts/
+EOF

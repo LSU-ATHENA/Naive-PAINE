@@ -1,8 +1,16 @@
+"""
+Score Predictor model for PixArt.
+
+Combines noise encoder and text encoder with a fusion MLP head.
+Supports single-head (one target) or multi-head (all 3 targets) prediction.
+"""
+
 import torch
 import torch.nn as nn
 import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any
+
 
 class ScorePredictor(nn.Module):
     """
