@@ -4,7 +4,7 @@ Naïve PAINE (Prompt-Aware Initial Noise Evaluator) is a lightweight predictor t
 
 
 
-*This repository provides the official implementation for Naïve PAINE, including dataset generation, predictor training, and inference with pre-trained checkpoints.*
+*This repository provides the official implementation for Naïve PAINE, including dataset generation, predictor training, and inference.*
 
 ## Overview
 
@@ -100,8 +100,7 @@ python run_pixart_sigma.py \
 |----------|-------------|
 | `--n-prompts` | Number of prompts to sample |
 | `--images-per-prompt` | Number of images (noises) per prompt |
-| `--metrics` | Subset of metrics: `hpsv2 image_reward pick_score clip_score` |
-| `--task-id` | Task ID for parallel job arrays |
+| `--metrics` | Subset of metrics: `hpsv2 image_reward pick_score hpsv3` |
 
 ## Training
 
@@ -163,20 +162,19 @@ The best checkpoint is saved to `experiments/<exp_name>/best.pth`.
 
 ### Training Arguments
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--model_type` | *required* | One of: `sdxl`, `dreamshaper`, `hunyuan_dit`, `pixart_sigma` |
-| `--data_dir` | *required* | Path to the generated dataset |
-| `--noise_enc` | `residualconv` | Noise encoder architecture |
-| `--text_enc` | `attnpool` | Text encoder: `attnpool` or `lightattnpool` (for PixArt-Sigma) |
-| `--target` | `pick_score` | Training target metric |
-| `--lr` | `1e-4` | Learning rate |
-| `--weight_decay` | `1e-8` | Weight decay |
-| `--epochs` | `100` | Number of training epochs |
-| `--loss` | `mae+srcc` | Loss function: `mae+srcc` or `mae+lambdarank` |
-| `--dropout` | `0.3` | Dropout rate |
-| `--k_prompts` | `12` | Prompts per batch for grouped batching |
-| `--ndcg_k` | `5` | k for NDCG@k evaluation |
+| Argument | Default | 
+|----------|---------|
+| `--model_type` | 'sdxl' | 
+| `--noise_enc` | `residualconv` | 
+| `--text_enc` | `attnpool` | 
+| `--target` | `pick_score` | 
+| `--lr` | `1e-4` | 
+| `--weight_decay` | `1e-8` |
+| `--epochs` | `100` |
+| `--loss` | `mae+srcc` | 
+| `--dropout` | `0.3` | 
+| `--k_prompts` | `12` | 
+| `--ndcg_k` | `5` | 
 
 ## Inference
 
