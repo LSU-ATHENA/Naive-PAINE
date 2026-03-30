@@ -5,3 +5,4 @@ output/
 ckpt/
 supplement_images/
 supplementary.zip
+.DS_Store
