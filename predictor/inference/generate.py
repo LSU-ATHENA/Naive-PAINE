@@ -1,13 +1,3 @@
-"""
-Multi-model image generation with predictor-selected noise.
-
-Supports: SDXL, DreamShaper, Hunyuan-DiT, PixArt-Sigma, PixArt-Alpha.
-
-Usage:
-    python -m predictor.inference.generate --model_type sdxl --checkpoint experiments/sdxl_best/best_model.pth --prompt "A cat"
-    python -m predictor.inference.generate --model_type hunyuan_dit --checkpoint experiments/hunyuan_best/best_model.pth --prompt "A sunset"
-"""
-
 import argparse
 import sys
 from pathlib import Path
@@ -19,7 +9,6 @@ from predictor.inference.noise_selection import generate_noise_candidates, selec
 from predictor.configs.model_dims import MODEL_DIMS, get_dims
 
 
-# Pipeline loading registry
 PIPELINE_CONFIG = {
     'sdxl': {
         'class': 'StableDiffusionXLPipeline',
@@ -37,7 +26,7 @@ PIPELINE_CONFIG = {
         'class': 'PixArtSigmaPipeline',
         'pretrained': 'PixArt-alpha/PixArt-Sigma-XL-2-1024-MS',
     },
-'sana_sprint': {
+    'sana_sprint': {
         'class': 'SanaSprintPipeline',
         'pretrained': 'Efficient-Large-Model/Sana_Sprint_0.6B_1024px_diffusers',
         'dtype': torch.bfloat16,
@@ -60,7 +49,6 @@ def load_pipeline(model_type: str, device: str = 'cuda', dtype=torch.float16):
 
 def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'cuda'):
     if model_type in ('sdxl', 'dreamshaper'):
-        # SDXL-family: encode_prompt returns (embeds, neg_embeds, pooled, neg_pooled)
         (
             prompt_embeds,
             negative_prompt_embeds,
@@ -74,8 +62,7 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
             do_classifier_free_guidance=True,
         )
 
-        # For predictor: use positive embeddings only
-        pred_embeds = prompt_embeds  # [1, 77, 2048]
+        pred_embeds = prompt_embeds
         pred_mask = torch.ones(pred_embeds.shape[:2], device=device, dtype=torch.long)
 
         gen_kwargs = {
@@ -86,10 +73,6 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
         }
 
     elif model_type == 'hunyuan_dit':
-        # Hunyuan-DiT: encode_prompt return signature varies by diffusers version:
-        #   >=0.30 (newer): 8 values (CLIP_emb, neg, T5_emb, neg, mask, neg_mask, mask2, neg_mask2)
-        #     or 4 values (CLIP_emb, neg, T5_emb, neg) without masks
-        #   0.36.0 (older): 4 values — CLIP only (emb, neg_emb, mask, neg_mask), no T5
         result = pipe.encode_prompt(
             prompt=prompt,
             device=device,
@@ -97,12 +80,9 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
             do_classifier_free_guidance=True,
         )
 
-        # Detect version by checking result[2] dtype:
-        #   T5 embeds would be float (3D tensor), CLIP mask would be int/long (2D tensor)
         has_t5_from_encode = (len(result) >= 4 and result[2].dtype in (torch.float16, torch.float32, torch.bfloat16))
 
         if has_t5_from_encode:
-            # Newer diffusers: encode_prompt returns both CLIP + T5
             prompt_embeds, negative_prompt_embeds = result[0], result[1]
             prompt_embeds_2, negative_prompt_embeds_2 = result[2], result[3]
 
@@ -117,8 +97,7 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
                 prompt_attention_mask_2 = torch.ones(prompt_embeds_2.shape[:2], device=device, dtype=torch.long)
                 negative_prompt_attention_mask_2 = torch.ones(negative_prompt_embeds_2.shape[:2], device=device, dtype=torch.long)
 
-            # Use T5 embeddings for predictor (prompt_embeds_2)
-            pred_embeds = prompt_embeds_2  # [1, 256, 2048]
+            pred_embeds = prompt_embeds_2
             pred_mask = prompt_attention_mask_2
 
             gen_kwargs = {
@@ -132,9 +111,7 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
                 'negative_prompt_attention_mask_2': negative_prompt_attention_mask_2,
             }
         else:
-            # Older diffusers (e.g. 0.36.0): encode_prompt returns CLIP only.
-            # Manually encode T5 for predictor scoring.
-            max_seq_len = get_dims(model_type)['seq_len']  # 256
+            max_seq_len = get_dims(model_type)['seq_len']
             tokens = pipe.tokenizer_2(
                 prompt,
                 max_length=max_seq_len,
@@ -147,14 +124,12 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
                     tokens.input_ids,
                     attention_mask=tokens.attention_mask,
                 )
-            pred_embeds = t5_output[0].to(dtype=torch.float16)  # [1, 256, 2048]
-            pred_mask = tokens.attention_mask  # [1, 256]
+            pred_embeds = t5_output[0].to(dtype=torch.float16)
+            pred_mask = tokens.attention_mask
 
-            # Let the pipeline handle encoding internally during generation
             gen_kwargs = {}
 
     elif model_type == 'pixart_sigma':
-        # PixArt: encode_prompt returns (embeds, mask, neg_embeds, neg_mask)
         max_seq_len = get_dims(model_type)['seq_len']
         (
             prompt_embeds,
@@ -170,7 +145,7 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
             max_sequence_length=max_seq_len,
         )
 
-        pred_embeds = prompt_embeds  # [1, seq_len, embed_dim]
+        pred_embeds = prompt_embeds
         pred_mask = prompt_attention_mask if prompt_attention_mask is not None else \
             torch.ones(pred_embeds.shape[:2], device=device, dtype=torch.long)
 
@@ -182,15 +157,14 @@ def encode_prompt_for_model(pipe, prompt: str, model_type: str, device: str = 'c
         }
 
     elif model_type == 'sana_sprint':
-        # SANA-Sprint: encode_prompt returns (prompt_embeds, prompt_attention_mask)
         prompt_embeds, prompt_attention_mask = pipe.encode_prompt(
             prompt=prompt,
             device=device,
             max_sequence_length=get_dims(model_type)['seq_len'],
         )
 
-        pred_embeds = prompt_embeds  # [1, 300, 2304]
-        pred_mask = prompt_attention_mask  # [1, 300]
+        pred_embeds = prompt_embeds
+        pred_mask = prompt_attention_mask
 
         gen_kwargs = {
             'prompt_embeds': prompt_embeds,
@@ -242,21 +216,17 @@ def main():
     print(f"  Output:     {output_dir}")
     print(f"{'='*60}")
 
-    # Load pipeline
     print(f"\nLoading {args.model_type} pipeline...")
     pipe = load_pipeline(args.model_type, device=args.device)
 
-    # Load predictor
     print(f"Loading predictor from {args.checkpoint}...")
     predictor, norm_info = load_predictor(args.checkpoint, device=args.device)
     print(f"  num_heads={predictor.num_heads}")
 
-    # Encode prompt
     pred_embeds, pred_mask, gen_kwargs = encode_prompt_for_model(
         pipe, args.prompt, args.model_type, args.device
     )
 
-    # Generate and select noise
     generator = torch.Generator(device=args.device).manual_seed(args.seed) if args.seed else None
     noises = generate_noise_candidates(
         num_candidates=args.N,
@@ -275,10 +245,8 @@ def main():
         head_index=args.head,
     )
 
-    # Don't pre-scale — pipeline's prepare_latents applies init_noise_sigma internally
     latents = selected
 
-    # Expand embeddings for B images
     B = args.B
     expanded_kwargs = {}
     for k, v in gen_kwargs.items():
@@ -287,7 +255,6 @@ def main():
         else:
             expanded_kwargs[k] = v
 
-    # Generate images
     print(f"\nGenerating {B} images from top-{B} of {args.N} candidates...")
     result = pipe(
         prompt=None,

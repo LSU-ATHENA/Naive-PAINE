@@ -12,9 +12,6 @@ from predictor.configs.model_dims import MODEL_DIMS, get_dims
 
 AVAILABLE_TARGETS = ['hpsv2', 'image_reward', 'pick_score', 'clip_score']
 
-# Model-specific embedding extraction config
-# key: which key in embeds/*.pt to load
-# mask_key: which key for attention mask (None = all ones)
 EMBEDDING_CONFIG = {
     'sdxl': {
         'key': 'prompt_embeds',
@@ -32,13 +29,12 @@ EMBEDDING_CONFIG = {
         'key': 'prompt_embeds',
         'mask_key': 'prompt_attention_mask',
     },
-'sana_sprint': {
+    'sana_sprint': {
         'key': 'prompt_embeds',
         'mask_key': 'prompt_attention_mask',
     },
 }
 
-# Override embedding keys when using a non-default text encoder.
 def _extract_embeds(
     embeddings: dict,
     model_type: str,
@@ -80,7 +76,6 @@ def _extract_t5_clip_combined(
     embed_dim: int,
     seq_len: int,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    # Extract T5
     t5_embeds = embeddings['prompt_embeds_2']
     if t5_embeds.dim() == 3:
         t5_embeds = t5_embeds.squeeze(0)
@@ -91,7 +86,6 @@ def _extract_t5_clip_combined(
     else:
         t5_mask = torch.ones(t5_embeds.shape[0], dtype=torch.long)
 
-    # Extract CLIP
     clip_embeds = embeddings['prompt_embeds']
     if clip_embeds.dim() == 3:
         clip_embeds = clip_embeds.squeeze(0)
@@ -102,18 +96,15 @@ def _extract_t5_clip_combined(
     else:
         clip_mask = torch.ones(clip_embeds.shape[0], dtype=torch.long)
 
-    # Zero-pad CLIP from 1024 -> 2048 to match T5 dim
     t5_dim = t5_embeds.shape[1]
     clip_dim = clip_embeds.shape[1]
     if clip_dim < t5_dim:
         pad = torch.zeros(clip_embeds.shape[0], t5_dim - clip_dim)
         clip_embeds = torch.cat([clip_embeds, pad], dim=1)
 
-    # Concatenate: T5 tokens first, then CLIP tokens
     embeds = torch.cat([t5_embeds, clip_embeds], dim=0)
     mask = torch.cat([t5_mask, clip_mask], dim=0)
 
-    # Pad or truncate to target seq_len
     current_len = embeds.shape[0]
     if current_len < seq_len:
         pad_embeds = torch.zeros(seq_len - current_len, embeds.shape[1])
@@ -189,7 +180,6 @@ class PNMDataset(Dataset):
             self._embed_cache[pid] = (embeds, mask)
         print(f"  Preloaded embeddings ({len(self._embed_cache)} prompts)")
 
-        # Preload all noise tensors into RAM to eliminate disk I/O during training.
         print(f"  Preloading {len(samples)} noise tensors...")
         self._noise_cache = {}
         for rec in samples:
@@ -213,7 +203,6 @@ class PNMDataset(Dataset):
         prompt_id = record['prompt_id']
         sample_idx = record['sample_idx']
 
-        # Load noise from cache
         noise = self._noise_cache[(prompt_id, sample_idx)]
 
         prompt_embeds, prompt_mask = self._get_embeddings(prompt_id)
@@ -237,7 +226,6 @@ class PromptGroupedBatchSampler(torch.utils.data.Sampler):
         self.shuffle = shuffle
         self.k = k_prompts_per_batch
 
-        # Build prompt_id -> [dataset indices] mapping
         self.prompt_to_indices: Dict[int, List[int]] = {}
         for idx, record in enumerate(dataset.samples):
             pid = record['prompt_id']
@@ -257,7 +245,6 @@ class PromptGroupedBatchSampler(torch.utils.data.Sampler):
         if self.shuffle:
             random.shuffle(prompt_ids)
 
-        # Yield complete batches only (drop_last behavior)
         for i in range(0, len(prompt_ids) - self.k + 1, self.k):
             batch_prompts = prompt_ids[i:i + self.k]
             batch_indices = []
@@ -300,7 +287,6 @@ def prep_dataloaders(
 
     print(f"Found {len(all_prompt_ids)} unique prompts")
 
-    # Limit number of prompts if requested
     if max_prompts > 0 and max_prompts < len(all_prompt_ids):
         all_prompt_ids = all_prompt_ids[:max_prompts]
         all_records = [r for r in all_records if r['prompt_id'] in set(all_prompt_ids)]
@@ -350,7 +336,6 @@ def prep_dataloaders(
     test_ds = PNMDataset(samples=test_records, **common_kwargs)
 
     if k_prompts_per_batch > 0:
-        # Grouped batching: K prompts per batch, all their samples together
         grouped_sampler = PromptGroupedBatchSampler(train_ds, k_prompts_per_batch, shuffle=True)
         train_loader = DataLoader(
             train_ds,
@@ -359,7 +344,6 @@ def prep_dataloaders(
             pin_memory=True,
         )
     else:
-        # Standard global shuffle
         train_loader = DataLoader(
             train_ds, batch_size=batch_size, shuffle=True,
             num_workers=num_workers, pin_memory=True, drop_last=True,

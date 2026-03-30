@@ -23,16 +23,14 @@ MODEL_DIMS = {
         'embed_dim': 4096,
         'seq_len': 300,
     },
-'sana_sprint': {
-        'latent_shape': (32, 32, 32),   # DC-AE f32c32: 32 channels, 32x spatial compression
+    'sana_sprint': {
+        'latent_shape': (32, 32, 32),
         'spatial_size': 32,
-        'embed_dim': 2304,              # Gemma-2-2B-IT caption_channels
+        'embed_dim': 2304,
         'seq_len': 300,
     },
 }
 
-# Override embed_dim/seq_len when using a non-default text encoder.
-# Models with a single text encoder don't need entries here.
 TEXT_EMBED_OVERRIDES = {
     'hunyuan_dit': {
         't5+clip': {'embed_dim': 2048, 'seq_len': 333},

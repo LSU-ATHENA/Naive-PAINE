@@ -140,7 +140,6 @@ class ScorePredictor(nn.Module):
         dropout = model_config.get('dropout', arch.get('dropout', 0.1))
         num_heads = model_config.get('num_heads', arch.get('num_heads', 1))
 
-        # Get dimension info from checkpoint (with backward-compatible defaults)
         spatial_size = model_config.get('spatial_size', 64)
         in_channels = model_config.get('in_channels', 4)
         embed_dim = model_config.get('embed_dim', 4096)
@@ -157,7 +156,6 @@ class ScorePredictor(nn.Module):
             num_heads=num_heads,
         )
 
-        # Handle float16 checkpoints: cast to float32 to match model dtype
         state_dict = {k: v.float() for k, v in checkpoint['model_state_dict'].items()}
         model.load_state_dict(state_dict)
         model.to(device)

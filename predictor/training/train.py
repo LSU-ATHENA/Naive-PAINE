@@ -167,53 +167,37 @@ def main():
                         choices=list(MODEL_DIMS.keys()))
     parser.add_argument('--data_dir', type=str, required=True)
 
-    parser.add_argument('--noise_enc', type=str, default='custom', choices=NOISE_ENCODERS)
-    parser.add_argument('--text_enc', type=str, default='summarytoken', choices=TEXT_ENCODERS)
+    parser.add_argument('--noise_enc', type=str, default='residualconv', choices=NOISE_ENCODERS)
+    parser.add_argument('--text_enc', type=str, default='attnpool', choices=TEXT_ENCODERS)
 
-    parser.add_argument('--target', type=str, default='hpsv2', choices=AVAILABLE_TARGETS)
-    parser.add_argument('--split_by', type=str, default='prompt', choices=['prompt', 'seed'])
+    parser.add_argument('--target', type=str, default='pick_score', choices=AVAILABLE_TARGETS)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-8)
     parser.add_argument('--batch_size', type=int, default=256)
-    parser.add_argument('--epochs', type=int, default=-1)
+    parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--loss', type=str, default='mae+srcc',
                         choices=['mae+srcc', 'mae+lambdarank'])
-    parser.add_argument('--gain_type', type=str, default='exp2', choices=['exp2', 'identity'])
     parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--pos_encoding', type=str, default='none',
-                        choices=['none', 'sinusoidal'])
-    parser.add_argument('--text_embed_type', type=str, default='default',
-                        choices=['default', 't5', 't5+clip'])
     parser.add_argument('--exp_name', type=str, default='baseline')
     parser.add_argument('--output_dir', type=str, default='./experiments')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--num_workers', type=int, default=2)
     parser.add_argument('--max_prompts', type=int, default=-1)
 
-    parser.add_argument('--k_prompts', type=int, default=2)
+    parser.add_argument('--k_prompts', type=int, default=6)
 
     parser.add_argument('--ndcg_k', type=int, default=3)
 
-    parser.add_argument('--patience', type=int, default=-1)
-
-    parser.add_argument('--primary_metric', type=str, default='ndcg',
-                        choices=['ndcg', 'srcc', 'mae', 'pearson'])
+    parser.add_argument('--primary_metric', type=str, default='srcc',
+                        choices=['ndcg', 'srcc'])
 
     args = parser.parse_args()
 
-    dims = get_dims(args.model_type, text_embed_type=args.text_embed_type)
+    dims = get_dims(args.model_type)
     spatial_size = dims['spatial_size']
     in_channels = dims['latent_shape'][0]
     embed_dim = dims['embed_dim']
     seq_len = dims['seq_len']
-
-    if args.epochs == -1 or args.patience == -1:
-        default_epochs, default_patience = 30, 12
-
-        if args.epochs == -1:
-            args.epochs = default_epochs
-        if args.patience == -1:
-            args.patience = default_patience
 
     set_seed(args.seed)
     exp_dir = Path(args.output_dir) / f"{args.exp_name}"
@@ -233,12 +217,11 @@ def main():
         data_dir=args.data_dir,
         model_type=args.model_type,
         target=args.target,
-        split_by=args.split_by,
+        split_by='prompt',
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         seed=args.seed,
         k_prompts_per_batch=args.k_prompts,
-        text_embed_type=args.text_embed_type,
         max_prompts=args.max_prompts,
     )
 
@@ -253,7 +236,7 @@ def main():
         in_channels=in_channels,
         embed_dim=embed_dim,
         seq_len=seq_len,
-        pos_encoding=args.pos_encoding,
+        pos_encoding='sinusoidal',
     ).to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -261,7 +244,7 @@ def main():
     if args.loss == 'mae+srcc':
         criterion = MAESRCCLoss(srcc_weight=1.0, regularization_strength=1e-2)
     elif args.loss == 'mae+lambdarank':
-        criterion = MAELambdaRankLoss(lambdarank_weight=1.0, sigma=1.0, gain_type=args.gain_type)
+        criterion = MAELambdaRankLoss(lambdarank_weight=1.0, sigma=1.0, gain_type='exp2')
     else:
         raise ValueError(f"Unknown loss: {args.loss}")
 
@@ -271,15 +254,11 @@ def main():
     )
 
     best_primary_value = float('-inf') if primary_higher_better else float('inf')
-    best_epoch = -1
-    best_val_metrics = {}
-
-    epochs_without_improvement = 0
 
     ndcg_key = f'ndcg_{args.ndcg_k}'
 
     for epoch in range(args.epochs):
-        train_stats = train_one_epoch(
+        train_one_epoch(
             model, train_loader, criterion, optimizer, device,
             epoch=epoch,
             loss_type=args.loss,
@@ -288,17 +267,15 @@ def main():
         val_metrics = evaluate(
             model, val_loader, device, args.ndcg_k,
             y_mean=y_mean, y_std=y_std,
-            gain_type=args.gain_type,
+            gain_type='exp2',
         )
 
         if args.primary_metric == 'ndcg':
             current_primary = val_metrics[ndcg_key]
         elif args.primary_metric == 'srcc':
             current_primary = val_metrics['srcc']
-        elif args.primary_metric == 'mae':
-            current_primary = val_metrics['mae_raw']
-        elif args.primary_metric == 'pearson':
-            current_primary = val_metrics['pearson']
+
+        print(f"Epoch {epoch+1}/{args.epochs}  SRCC={val_metrics['srcc']:.4f}  NDCG@{args.ndcg_k}={val_metrics[ndcg_key]:.4f} MAE={val_metrics['mae_raw']:.4f}")
 
         scheduler.step(current_primary)
 
@@ -314,8 +291,7 @@ def main():
                 'in_channels': in_channels,
                 'embed_dim': embed_dim,
                 'seq_len': seq_len,
-                'pos_encoding': args.pos_encoding,
-                'text_embed_type': args.text_embed_type,
+                'pos_encoding': 'sinusoidal',
             },
             'normalization': {
                 'target': args.target,
@@ -329,29 +305,16 @@ def main():
 
         if improved:
             best_primary_value = current_primary
-            best_epoch = epoch + 1
-            best_val_metrics = {
-                'mae_raw': val_metrics['mae_raw'],
-                'srcc': val_metrics['srcc'],
-                'pearson': val_metrics['pearson'],
-                ndcg_key: val_metrics[ndcg_key],
-            }
             torch.save(checkpoint, exp_dir / "best_model.pth")
-            epochs_without_improvement = 0
-        else:
-            epochs_without_improvement += 1
-
-        if epochs_without_improvement >= args.patience:
-            break
 
     checkpoint = torch.load(exp_dir / "best_model.pth", weights_only=False)
     state_dict = {k: v.float() for k, v in checkpoint['model_state_dict'].items()}
     model.load_state_dict(state_dict)
 
-    test_metrics = evaluate(
+    evaluate(
         model, test_loader, device, args.ndcg_k,
         y_mean=y_mean, y_std=y_std,
-        gain_type=args.gain_type,
+        gain_type='exp2',
     )
 
 

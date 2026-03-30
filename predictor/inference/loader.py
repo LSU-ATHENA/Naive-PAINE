@@ -14,7 +14,6 @@ def load_predictor(
 
     cfg = checkpoint["model_config"]
 
-    # Get dimensions from checkpoint (backward-compatible defaults)
     model_type = cfg.get("model_type", None)
     if model_type and model_type in MODEL_DIMS:
         dims = MODEL_DIMS[model_type]
@@ -23,7 +22,6 @@ def load_predictor(
         embed_dim = cfg.get("embed_dim", dims["embed_dim"])
         seq_len = cfg.get("seq_len", dims["seq_len"])
     else:
-        # Legacy checkpoint: use values from config or PixArt-Alpha defaults
         spatial_size = cfg.get("spatial_size", 64)
         in_channels = cfg.get("in_channels", 4)
         embed_dim = cfg.get("embed_dim", 4096)
@@ -41,7 +39,6 @@ def load_predictor(
         pos_encoding=cfg.get("pos_encoding", "none"),
     )
 
-    # Handle float16 checkpoints: cast to float32 to match model dtype
     state_dict = {k: v.float() for k, v in checkpoint["model_state_dict"].items()}
     model.load_state_dict(state_dict)
     model.to(device)

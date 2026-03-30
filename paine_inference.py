@@ -127,7 +127,6 @@ def main(args):
         else:
             expanded_kwargs[k] = v
 
-    # generate images with PAINE-selected noise
     paine_result = pipe(
         prompt=None,
         **expanded_kwargs,
@@ -142,7 +141,6 @@ def main(args):
     for i, img in enumerate(paine_result.images):
         img.save(f"{args.pipeline}_{args.prompt}_paine_{i:02d}.png")
 
-    # generate images with standard random noise
     latent = torch.randn(1, *dims["latent_shape"], dtype=dtype, device=device)
     standard_result = pipe(
         prompt=args.prompt,
