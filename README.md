@@ -214,8 +214,6 @@ Output is saved to the `--output-dir` directory. Inference steps and guidance sc
 | `--pretrained-path` | *required* | Path to PAINE checkpoint |
 | `--N` | `100` | Number of candidate noises to sample |
 | `--B` | `1` | Number of top noises to select for generation |
-| `--inference-step` | per-model | Override diffusion denoising steps |
-| `--cfg` | per-model | Override classifier-free guidance scale |
 | `--seed` | `0` | Random seed |
 | `--output-dir` | `output` | Output directory for generated images |
 
