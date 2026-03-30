@@ -278,4 +278,3 @@ If you find this work useful in your research, please consider citing our paper:
 
 ## Acknowledgments
 
-Our code was developed based on [diffusers](https://github.com/huggingface/diffusers). We use [PickScore](https://github.com/yuvalkirstain/PickScore) as the primary human preference metric and [Pick-a-Pic](https://huggingface.co/datasets/yuvalkirstain/pickapic_v2) for the prompt set. We compare against [Golden Noise](https://github.com/xie-lab-ml/Golden-Noise-for-Diffusion-Models) as a primary baseline.
