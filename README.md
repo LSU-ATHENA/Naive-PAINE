@@ -7,8 +7,6 @@
 
 </div>
 
-*This repository provides the official implementation for Naïve PAINE, including dataset generation, predictor training, and inference.*
-
 ## Overview
 
 ![paine-1](assets/paine-1.png)
@@ -34,7 +32,7 @@ conda activate paine
 pip install -r requirements.txt
 ```
 
-> **Note:** `torchsort` is required for the differentiable SRCC loss used during predictor training. It is not needed for inference only. See [torchsort](https://github.com/teddykoker/torchsort) for installation details if you encounter build issues.
+> **Note:** `torchsort` is required for the differentiable SRCC loss used during predictor training. It is not needed for inference only. See [torchsort](https://github.com/teddykoker/torchsort) for installation details.
 
 ## Dataset
 
