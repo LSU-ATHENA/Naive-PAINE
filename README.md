@@ -24,12 +24,14 @@ We evaluate on four text-to-image diffusion models: Stable Diffusion XL, DreamSh
 Clone this repository and install dependencies:
 
 ```bash
-git clone https://github.com/LSU-ATHENA/paine_main.git
+git clone https://github.com/Xiuyu-Li/paine.git
 cd paine
 conda create -n paine python=3.10
 conda activate paine
 pip install -r requirements.txt
 ```
+
+> **Note:** `torchsort` is required for the differentiable SRCC loss used during predictor training. It is not needed for inference only. See [torchsort](https://github.com/teddykoker/torchsort) for installation details if you encounter build issues.
 
 ## Dataset
 
@@ -94,6 +96,17 @@ python run_pixart_sigma.py \
     --seed 42
 ```
 
+**SANA-Sprint**
+```bash
+cd gen_dataset
+python run_sana_sprint.py \
+    --n-prompts 5000 \
+    --images-per-prompt 20 \
+    --save-dir data/generated/sana_sprint_1024 \
+    --seed 42
+```
+
+
 #### Data Generation Arguments
 
 | Argument | Description |
@@ -156,6 +169,16 @@ python -m predictor.training.train \
     --k_prompts 12 \
     --epochs 100 \
     --exp_name pixart_sigma
+```
+
+**SANA-Sprint**
+```bash
+python -m predictor.training.train \
+    --model_type sana_sprint \
+    --data_dir data/generated/sana_sprint_1024 \
+    --k_prompts 12 \
+    --epochs 100 \
+    --exp_name sana_sprint
 ```
 
 The best checkpoint is saved to `experiments/<exp_name>/best.pth`.
@@ -228,6 +251,4 @@ If you find this work useful in your research, please consider citing our paper:
   year={2026}
 }
 ```
-
-## Acknowledgments
 
