@@ -1,8 +1,11 @@
-# Naïve PAINE: Lightweight Text-to-Image Generation Improvement with Prompt Evaluation [[paper](https://arxiv.org/abs/2603.12506)]
+# Naïve PAINE: Lightweight Text-to-Image Generation Improvement with Prompt Evaluation
 
-Naïve PAINE (Prompt-Aware Initial Noise Evaluator) is a lightweight predictor that estimates the quality of initial noise for text-to-image diffusion models *prior to generation*. Given a prompt and a set of randomly sampled noises, PAINE scores each noise and selects the best candidates, improving generation quality without modifying the diffusion model itself.
+<div align="center">
 
+[![arXiv](https://img.shields.io/badge/arXiv-2603.12506-b31b1b.svg)](https://arxiv.org/abs/2603.12506)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Huggingface-Model-green)](https://huggingface.co/LSU-ATHENA/PAINE)
 
+</div>
 
 *This repository provides the official implementation for Naïve PAINE, including dataset generation, predictor training, and inference.*
 
