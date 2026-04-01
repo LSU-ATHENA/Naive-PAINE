@@ -25,7 +25,7 @@ We evaluate on four text-to-image diffusion models: Stable Diffusion XL, DreamSh
 Clone this repository and install dependencies:
 
 ```bash
-git clone https://github.com/Xiuyu-Li/paine.git
+git clone https://github.com/LSU-ATHENA/noise_optim.git
 cd paine
 conda create -n paine python=3.10
 conda activate paine
