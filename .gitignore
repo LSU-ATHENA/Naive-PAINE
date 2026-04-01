@@ -6,3 +6,5 @@ ckpt/
 supplement_images/
 supplementary.zip
 .DS_Store
+Dataset/
+logs/
