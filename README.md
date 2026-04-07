@@ -29,10 +29,13 @@ git clone https://github.com/LSU-ATHENA/noise_optim.git
 cd paine
 conda create -n paine python=3.10
 conda activate paine
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+pip install diffusers transformers accelerate sentencepiece safetensors beautifulsoup4
 pip install -r requirements.txt
 ```
 
 > **Note:** `torchsort` is required for the differentiable SRCC loss used during predictor training. It is not needed for inference only. See [torchsort](https://github.com/teddykoker/torchsort) for installation details.
+
 
 ## Dataset
 
