@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-from datagen.prompt_loader import load_train_prompts
-from datagen.pixart_sigma import PixartSigmaGenerator
+from ECCV2026.paine_original.gen_dataset.datagen.prompt_loader import load_train_prompts
+from ECCV2026.paine_original.gen_dataset.datagen.pixart_sigma import PixartSigmaGenerator
 
 
 def main():

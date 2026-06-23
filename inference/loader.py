@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from typing import Tuple, Dict, Any
 
-from predictor.models import get_model
-from predictor.configs.model_dims import MODEL_DIMS
+from model import get_model
+from model.config import MODEL_DIMS
 
 
 def load_predictor(

@@ -8,3 +8,6 @@ supplementary.zip
 .DS_Store
 Dataset/
 logs/
+weights/
+experiments/
+data/generated/
