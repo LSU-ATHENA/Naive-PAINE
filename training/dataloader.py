@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from predictor.configs.model_dims import MODEL_DIMS, get_dims
+from model.config import MODEL_DIMS, get_dims
 
 
 AVAILABLE_TARGETS = ['hpsv2', 'image_reward', 'pick_score', 'clip_score']

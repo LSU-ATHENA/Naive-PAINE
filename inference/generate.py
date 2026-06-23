@@ -4,9 +4,11 @@ from pathlib import Path
 
 import torch
 
-from predictor.inference.loader import load_predictor
-from predictor.inference.noise_selection import generate_noise_candidates, select_top_k_noise
-from predictor.configs.model_dims import MODEL_DIMS, get_dims
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from loader import load_predictor
+from selection import generate_noise_candidates, select_top_k_noise
+from model.config import MODEL_DIMS, get_dims
 
 
 PIPELINE_CONFIG = {

@@ -36,6 +36,22 @@ def spearman_corrcoef(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return torch.tensor(corr, dtype=x.dtype)
 
 
+def spearman_per_prompt(preds: torch.Tensor, targets: torch.Tensor, prompt_ids: torch.Tensor) -> float:
+    """Within-prompt Spearman, averaged over prompts (the selection signal; global srcc is the prior)."""
+    p = preds.detach().cpu().float().numpy()
+    t = targets.detach().cpu().float().numpy()
+    pid = prompt_ids.detach().cpu().numpy()
+    out = []
+    for u in np.unique(pid):
+        m = pid == u
+        if m.sum() < 2 or p[m].std() < 1e-9 or t[m].std() < 1e-9:
+            continue
+        c, _ = spearmanr(p[m], t[m])
+        if not np.isnan(c):
+            out.append(c)
+    return float(np.mean(out)) if out else 0.0
+
+
 def ndcg_at_k(
     preds: torch.Tensor,
     targets: torch.Tensor,
@@ -165,10 +181,17 @@ class SRCCLoss(nn.Module):
 
 class LambdaRankLoss(nn.Module):
 
-    def __init__(self, sigma: float = 1.0, gain_type: str = 'exp2'):
+    def __init__(self, sigma: float = 1.0, gain_type: str = 'exp2', k: int = 0):
         super().__init__()
         self.sigma = sigma
         self.gain_type = gain_type
+        self.k = k  # NDCG@k truncation; 0 = full-rank (LambdaRank), >0 = LambdaLoss@k
+
+    def _discount(self, rank: torch.Tensor) -> torch.Tensor:
+        d = 1.0 / torch.log2(rank + 1.0)
+        if self.k > 0:
+            d = torch.where(rank <= self.k, d, torch.zeros_like(d))
+        return d
 
     def _compute_max_dcg(self, targets: torch.Tensor) -> float:
         t = targets.view(-1).float()
@@ -183,7 +206,7 @@ class LambdaRankLoss(nn.Module):
             gains = shifted
 
         positions = torch.arange(1, n + 1, device=t.device, dtype=torch.float32)
-        discounts = 1.0 / torch.log2(positions + 1.0)
+        discounts = self._discount(positions)   # IDCG@k: positions are ideal-ranked, _discount zeros rank>k
 
         return (gains * discounts).sum().item()
 
@@ -223,8 +246,7 @@ class LambdaRankLoss(nn.Module):
         else:
             gain_diff = tgt_shifted - tgt_shifted.t()
 
-        decay_diff = (1.0 / torch.log2(rank32 + 1.0) -
-                     1.0 / torch.log2(rank32.t() + 1.0))
+        decay_diff = self._discount(rank32) - self._discount(rank32.t())
 
         delta_ndcg = torch.abs(N * gain_diff * decay_diff)
 
@@ -290,10 +312,10 @@ class MAESRCCLoss(nn.Module):
 
 class MAELambdaRankLoss(nn.Module):
 
-    def __init__(self, lambdarank_weight: float = 1.0, sigma: float = 1.0, gain_type: str = 'exp2'):
+    def __init__(self, lambdarank_weight: float = 1.0, sigma: float = 1.0, gain_type: str = 'exp2', k: int = 0):
         super().__init__()
         self.mae = nn.L1Loss()
-        self.lambdarank = LambdaRankLoss(sigma=sigma, gain_type=gain_type)
+        self.lambdarank = LambdaRankLoss(sigma=sigma, gain_type=gain_type, k=k)
         self.lambdarank_weight = lambdarank_weight
 
     def forward(
