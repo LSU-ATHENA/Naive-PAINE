@@ -220,17 +220,6 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"{'='*60}")
-    print(f"PNM Multi-Model Image Generation")
-    print(f"{'='*60}")
-    print(f"  Model type: {args.model_type}")
-    print(f"  Latent:     {latent_shape}")
-    print(f"  Prompt:     {args.prompt}")
-    print(f"  N:          {args.N} noise candidates")
-    print(f"  B:          {args.B} images")
-    print(f"  Checkpoint: {args.checkpoint}")
-    print(f"  Output:     {output_dir}")
-    print(f"{'='*60}")
 
     print(f"\nLoading {args.model_type} pipeline...")
     pipe = load_pipeline(args.model_type, device=args.device,
@@ -238,7 +227,7 @@ def main():
 
     print(f"Loading predictor from {args.checkpoint}...")
     predictor, norm_info = load_predictor(args.checkpoint, device=args.device)
-    print(f"  num_heads={predictor.num_heads}")
+    # print(f"  num_heads={predictor.num_heads}")
 
     pred_embeds, pred_mask, gen_kwargs = encode_prompt_for_model(
         pipe, args.prompt, args.model_type, args.device
@@ -301,8 +290,6 @@ def main():
             path = output_dir / f"{args.model_type}_random_{i:02d}.png"
             img.save(path)
             print(f"  Saved: {path}")
-
-    print(f"\nDone! Images saved to {output_dir}/")
 
 
 if __name__ == "__main__":
