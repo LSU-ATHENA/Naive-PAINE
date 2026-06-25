@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import argparse
-from ECCV2026.paine_original.gen_dataset.datagen.prompt_loader import load_train_prompts
-from ECCV2026.paine_original.gen_dataset.datagen.hunyuan_dit import HunyuanDiTGenerator
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from gen_dataset.datagen.prompt_loader import load_train_prompts
+from gen_dataset.datagen.dreamshaper import DreamShaperGenerator
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--n-prompts', type=int, default=5000)
     p.add_argument('--images-per-prompt', type=int, default=10)
-    p.add_argument('--save-dir', type=str, default='data/generated/hunyuan_dit_1024')
+    p.add_argument('--save-dir', type=str, default='data/generated/dreamshaper_xl_turbo')
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--start-idx', type=int, default=0)
     p.add_argument('--end-idx', type=int, default=None)
@@ -27,7 +31,7 @@ def main():
     )
     end_idx = args.end_idx or len(prompts)
 
-    gen = HunyuanDiTGenerator(
+    gen = DreamShaperGenerator(
         save_dir=args.save_dir, prompts=prompts,
         num_images_per_prompt=args.images_per_prompt,
         master_seed=args.seed, seed_range=tuple(args.seed_range),

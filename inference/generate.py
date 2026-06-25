@@ -36,16 +36,23 @@ PIPELINE_CONFIG = {
 }
 
 
-def load_pipeline(model_type: str, device: str = 'cuda', dtype=torch.float16):
+def load_pipeline(model_type: str, device: str = 'cuda', dtype=torch.float16,
+                  base_model: str = None, lora: str = None, lora_scale: float = 1.0):
     import diffusers
 
     config = PIPELINE_CONFIG[model_type]
     pipe_class = getattr(diffusers, config['class'])
     pipe_dtype = config.get('dtype', dtype)
-    pipe = pipe_class.from_pretrained(
-        config['pretrained'],
-        torch_dtype=pipe_dtype,
-    ).to(device)
+    src = base_model or config['pretrained']
+    if base_model and (src.endswith(('.safetensors', '.ckpt')) or Path(src).is_file()):
+        pipe = pipe_class.from_single_file(src, torch_dtype=pipe_dtype).to(device)   # CivitAI single file
+    else:
+        pipe = pipe_class.from_pretrained(src, torch_dtype=pipe_dtype).to(device)    # HF repo / diffusers dir
+    if lora:
+        pipe.load_lora_weights(lora)
+        pipe.fuse_lora(lora_scale=lora_scale)
+    if model_type in ('sdxl', 'dreamshaper') and hasattr(pipe, 'upcast_vae'):
+        pipe.upcast_vae()   # SDXL fp16 VAE -> avoids black images
     return pipe
 
 
@@ -187,6 +194,13 @@ def main():
                         choices=list(MODEL_DIMS.keys()), help="Diffusion model type")
     parser.add_argument("--checkpoint", type=str, required=True,
                         help="Path to predictor checkpoint (.pth)")
+    parser.add_argument("--base_model", type=str, default=None,
+                        help="Generation backbone override: any SDXL-based checkpoint "
+                             "(HF repo id or local .safetensors). Default = model_type's base "
+                             "pipeline. The predictor (--checkpoint) is unchanged.")
+    parser.add_argument("--lora", type=str, default=None,
+                        help="Optional LoRA to fuse onto the backbone (HF repo id or local .safetensors).")
+    parser.add_argument("--lora_scale", type=float, default=1.0, help="LoRA fusion scale.")
     parser.add_argument("--prompt", type=str, required=True, help="Text prompt")
     parser.add_argument("--N", type=int, default=100, help="Number of noise candidates")
     parser.add_argument("--B", type=int, default=4, help="Number of images to generate")
@@ -219,7 +233,8 @@ def main():
     print(f"{'='*60}")
 
     print(f"\nLoading {args.model_type} pipeline...")
-    pipe = load_pipeline(args.model_type, device=args.device)
+    pipe = load_pipeline(args.model_type, device=args.device,
+                         base_model=args.base_model, lora=args.lora, lora_scale=args.lora_scale)
 
     print(f"Loading predictor from {args.checkpoint}...")
     predictor, norm_info = load_predictor(args.checkpoint, device=args.device)
@@ -238,7 +253,7 @@ def main():
         generator=generator,
     )
 
-    selected = select_top_k_noise(
+    selected, _ = select_top_k_noise(
         predictor=predictor,
         noises=noises,
         prompt_embeds=pred_embeds,

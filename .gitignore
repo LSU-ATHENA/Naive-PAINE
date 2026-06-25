@@ -6,8 +6,9 @@ ckpt/
 supplement_images/
 supplementary.zip
 .DS_Store
-Dataset/
 logs/
+scripts/
 weights/
 experiments/
-data/generated/
+lora/
+basemodels/

@@ -100,8 +100,7 @@ class _BasicBlock(nn.Module):
 
 
 class ResNetNoiseEncoder(nn.Module):
-    """4-stage ResNet gradually downsamples the latent X_T while increasing channels, 
-    adaptive-max-pool collapses the spatial dims to 1 for a vector output."""
+    """4-stage ResNet: downsamples the latent while widening channels, adaptive-max-pool to a vector."""
 
     def __init__(self, in_channels: int = 4, spatial_size: int = 128,
                  widths=(64, 128, 256, 512), dropout: float = 0.1):
@@ -112,7 +111,7 @@ class ResNetNoiseEncoder(nn.Module):
             nn.SiLU(),
         )
         stages, in_ch = [], widths[0]
-        for w in widths:                          # 4 stages, each downsamples /2
+        for w in widths:
             stages.append(_BasicBlock(in_ch, w, stride=2, dropout=dropout))
             in_ch = w
         self.stages = nn.Sequential(*stages)
@@ -132,16 +131,12 @@ class ResNetNoiseEncoder(nn.Module):
 
 def get_noise_encoder(name: str = 'custom', spatial_size: int = 128,
                       in_channels: int = 4, dropout: float = 0.1, **kwargs) -> nn.Module:
-    if name == 'custom':
-        return CustomNoiseEncoder(in_channels=in_channels, spatial_size=spatial_size)
     if name == 'resnet':
         return ResNetNoiseEncoder(in_channels=in_channels, spatial_size=spatial_size, dropout=dropout)
-    raise ValueError(f"Unknown noise encoder: {name}. Available: ['custom', 'resnet']")
+    return CustomNoiseEncoder(in_channels=in_channels, spatial_size=spatial_size)
 
 
 import math
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -370,48 +365,11 @@ class LightAttnPool(nn.Module):
         return x
 
 
-class PerTokenScalarTextEncoder(nn.Module):
-
-    def __init__(self, embed_dim: int = 4096, seq_len: int = 120, **kwargs):
-        super().__init__()
-        self.project = nn.Sequential(
-            nn.Linear(embed_dim, 2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1),
-        )
-        self._output_dim = seq_len
-
-    @property
-    def output_dim(self) -> int:
-        return self._output_dim
-
-    def forward(
-        self,
-        prompt_embeds: torch.Tensor,
-        prompt_mask: torch.Tensor,
-    ) -> torch.Tensor:
-        return self.project(prompt_embeds).squeeze(-1)
-
-
 def get_text_encoder(name: str, embed_dim: int = 4096, seq_len: int = 120, **kwargs) -> nn.Module:
-
     encoders = {
-        'attnpool': AttnPool,
-        'lightattnpool': LightAttnPool,
-        'pertokenscalar': PerTokenScalarTextEncoder,
-        'summarytoken': AttnPool,
-        'lightsummary': LightAttnPool,
+        'summarytoken': AttnPool,      # SDXL, DreamShaper, Hunyuan, Sana
+        'lightsummary': LightAttnPool,  # PixArt-Sigma
     }
-
     if name not in encoders:
         raise ValueError(f"Unknown text encoder: {name}. Available: {list(encoders.keys())}")
-
     return encoders[name](embed_dim=embed_dim, seq_len=seq_len, **kwargs)

@@ -144,7 +144,7 @@ class ScorePredictor(nn.Module):
 
         pos_encoding = model_config.get('pos_encoding', 'none')
         text_encoder = get_text_encoder(text_enc_name, embed_dim=embed_dim, seq_len=seq_len, pos_encoding=pos_encoding)
-        noise_encoder = get_noise_encoder(spatial_size=spatial_size, in_channels=in_channels)
+        noise_encoder = get_noise_encoder(noise_enc_name, spatial_size=spatial_size, in_channels=in_channels, dropout=dropout)
 
         model = cls(
             noise_encoder=noise_encoder,
@@ -162,12 +162,12 @@ class ScorePredictor(nn.Module):
         return model, normalization_info
 
 
-NOISE_ENCODERS = ['custom', 'resnet']
-TEXT_ENCODERS = ['summarytoken', 'lightsummary', 'pertokenscalar']
+NOISE_ENCODERS = ['custom', 'resnet']  # 'custom' = CustomNoiseEncoder (straight downsample), 'resnet' = ResNetNoiseEncoder
+TEXT_ENCODERS = ['summarytoken', 'lightsummary']
 
 
 def get_model(
-    noise_enc: str = 'custom',
+    noise_enc: str = 'resnet',
     text_enc: str = 'summarytoken',
     dropout: float = 0.1,
     num_heads: int = 1,
@@ -182,6 +182,6 @@ def get_model(
     if text_enc not in TEXT_ENCODERS:
         raise ValueError(f"Unknown text encoder: {text_enc}. Available: {TEXT_ENCODERS}")
     text_encoder = get_text_encoder(text_enc, embed_dim=embed_dim, seq_len=seq_len, pos_encoding=pos_encoding)
-    noise_encoder = get_noise_encoder(spatial_size=spatial_size, in_channels=in_channels)
+    noise_encoder = get_noise_encoder(noise_enc, spatial_size=spatial_size, in_channels=in_channels, dropout=dropout)
     return ScorePredictor(noise_encoder=noise_encoder, text_encoder=text_encoder,
                           dropout=dropout, num_heads=num_heads)

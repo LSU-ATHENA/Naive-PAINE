@@ -20,8 +20,8 @@ from losses import (
     pearson_corrcoef,
     spearman_per_prompt,
     MAESRCCLoss,
-    MAELambdaRankLoss,
 )
+from allrank import AllRankLoss
 
 
 def set_seed(seed: int):
@@ -35,7 +35,6 @@ def set_seed(seed: int):
 def train_one_epoch(model, loader, criterion, optimizer, device, use_grouped=False) -> Dict[str, float]:
     model.train()
     running_total_loss = 0.0
-    uses_lambdarank = isinstance(criterion, MAELambdaRankLoss)
 
     for batch in loader:
         noise = batch['noise'].to(device)
@@ -46,14 +45,8 @@ def train_one_epoch(model, loader, criterion, optimizer, device, use_grouped=Fal
 
         optimizer.zero_grad()
         preds = model(noise, prompt_embeds, prompt_mask)
-
-        if uses_lambdarank:
-            loss = criterion(preds, targets, group_ids=group_ids)
-            criterion.backward(preds, targets, loss, group_ids=group_ids)
-        else:
-            loss = criterion(preds, targets, group_ids=group_ids) if group_ids is not None \
-                else criterion(preds, targets)
-            loss.backward()
+        loss = criterion(preds, targets, group_ids=group_ids)
+        loss.backward()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
@@ -146,7 +139,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--model_type', required=True, choices=list(MODEL_DIMS))
     ap.add_argument('--data_dir', required=True)
-    ap.add_argument('--noise_enc', default='custom', choices=NOISE_ENCODERS)
+    ap.add_argument('--noise_enc', default='resnet', choices=NOISE_ENCODERS)
     ap.add_argument('--text_enc', default='summarytoken', choices=TEXT_ENCODERS)
     ap.add_argument('--text_embed_type', default='default')
     ap.add_argument('--target', default='pick_score', choices=AVAILABLE_TARGETS)
@@ -154,7 +147,8 @@ def main():
     ap.add_argument('--weight_decay', type=float, default=1e-8)
     ap.add_argument('--batch_size', type=int, default=256)
     ap.add_argument('--epochs', type=int, default=30)
-    ap.add_argument('--loss', default='mae+srcc', choices=['mae+srcc', 'mae+lambdarank'])
+    ap.add_argument('--loss', default='mae+srcc',
+                    choices=['mae+srcc', 'mae+lambdarank', 'mae+lambdaloss', 'neuralndcg'])
     ap.add_argument('--lambdarank_k', type=int, default=5)
     ap.add_argument('--dropout', type=float, default=0.3)
     ap.add_argument('--k_prompts', type=int, default=6)
@@ -166,6 +160,9 @@ def main():
     ap.add_argument('--output_dir', default='./experiments')
     ap.add_argument('--eval_only', default=None, help='path to a .pth: load it, evaluate, exit (no training)')
     args = ap.parse_args()
+
+    if args.model_type == 'hunyuan_dit' and args.text_embed_type == 'default':
+        args.text_embed_type = 't5+clip'  # Hunyuan trains on combined T5+CLIP (seq_len 333)
 
     set_seed(args.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -209,7 +206,9 @@ def main():
     if args.loss == 'mae+srcc':
         criterion = MAESRCCLoss(srcc_weight=1.0, regularization_strength=1e-2)
     else:
-        criterion = MAELambdaRankLoss(lambdarank_weight=1.0, sigma=1.0, gain_type='exp2', k=args.lambdarank_k)
+        kind = {'mae+lambdarank': 'lambdarank', 'mae+lambdaloss': 'lambdaloss',
+                'neuralndcg': 'neuralndcg'}[args.loss]
+        criterion = AllRankLoss(kind=kind, k=args.lambdarank_k, use_mae=True)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
 
     def save_ckpt(path):
