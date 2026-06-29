@@ -135,6 +135,21 @@ def expand_kwargs(gen_kwargs, B):
     return out
 
 
+def encode_prompt_any(pipe, prompt, model, device):
+    if model == "hunyuan_dit":
+        pe0, npe0, pam0, npam0 = pipe.encode_prompt(prompt=prompt, device=device, num_images_per_prompt=1,
+                                                    do_classifier_free_guidance=True, text_encoder_index=0)
+        pe1, npe1, pam1, npam1 = pipe.encode_prompt(prompt=prompt, device=device, num_images_per_prompt=1,
+                                                    do_classifier_free_guidance=True, text_encoder_index=1)
+        gen_kwargs = {"prompt_embeds": pe0, "negative_prompt_embeds": npe0,
+                      "prompt_attention_mask": pam0, "negative_prompt_attention_mask": npam0,
+                      "prompt_embeds_2": pe1, "negative_prompt_embeds_2": npe1,
+                      "prompt_attention_mask_2": pam1, "negative_prompt_attention_mask_2": npam1}
+        return pe1, pam1, gen_kwargs, pe0
+    pred_embeds, pred_mask, gen_kwargs = encode_prompt_for_model(pipe, prompt, model, device)
+    return pred_embeds, pred_mask, gen_kwargs, gen_kwargs.get("prompt_embeds")
+
+
 def summarize(rows, metrics):
     agg = {}
     for r in rows:
@@ -214,8 +229,7 @@ def main():
         need_cond = any(m in ("golden", "noisear") for m in args.methods)
 
         for pidx, prompt in enumerate(prompts):
-            pred_embeds, pred_mask, gen_kwargs = encode_prompt_for_model(pipe, prompt, model, args.device)
-            cond_embeds = gen_kwargs.get("prompt_embeds")
+            pred_embeds, pred_mask, gen_kwargs, cond_embeds = encode_prompt_any(pipe, prompt, model, args.device)
             if need_cond:
                 if cond_embeds is None:
                     raise RuntimeError(f"{model}: encode returned no prompt_embeds; golden/noisear need conditioning embeds.")
